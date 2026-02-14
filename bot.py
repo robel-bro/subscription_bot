@@ -91,6 +91,7 @@ def status():
 
 # -------------------- Telegram Bot Handlers --------------------
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"Start command from user {update.effective_user.id}", flush=True)
     await update.message.reply_text(
         "Welcome! To get access to the private channel, please send a screenshot of your payment."
     )
@@ -114,7 +115,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=reply_markup
             )
         except Exception as e:
-            print(f"Failed to send to admin {admin_id}: {e}")
+            print(f"Failed to send to admin {admin_id}: {e}", flush=True)
 
     await update.message.reply_text(
         "Your screenshot has been sent to the admins. We'll notify you once it's approved."
@@ -180,14 +181,31 @@ async def approve_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- Run Bot in Background Thread --------------------
 def run_bot():
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    application = Application.builder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    application.add_handler(CallbackQueryHandler(handle_callback))
-    application.add_handler(CommandHandler("approve", approve_command))
-    print("Bot started (polling)...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        application = Application.builder().token(BOT_TOKEN).build()
+
+        # Delete any existing webhook to ensure polling works
+        loop.run_until_complete(application.bot.delete_webhook(drop_pending_updates=True))
+        print("Webhook cleared, starting polling...", flush=True)
+
+        # Test token by getting bot info
+        bot_info = loop.run_until_complete(application.bot.get_me())
+        print(f"Bot username: @{bot_info.username}", flush=True)
+
+        # Add handlers
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+        application.add_handler(CallbackQueryHandler(handle_callback))
+        application.add_handler(CommandHandler("approve", approve_command))
+
+        print("Bot started (polling)...", flush=True)
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    except Exception as e:
+        print(f"Polling error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
 
 threading.Thread(target=run_bot, daemon=True).start()
 
