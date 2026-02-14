@@ -242,7 +242,16 @@ def webhook_info():
     </body>
     </html>
     """
-
+@app.route("/bot_info")
+def bot_info():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        me = loop.run_until_complete(application.bot.get_me())
+        return f"Bot: @{me.username} (ID: {me.id})"
+    except Exception as e:
+        return f"Error: {e}"
+    
 # -------------------- Run Flask --------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
