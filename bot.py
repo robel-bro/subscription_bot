@@ -33,7 +33,7 @@ if _admins:
             ADMIN_IDS.append(int(x))
 
 PORT = int(os.environ.get("PORT", 8000))
-APP_URL = os.getenv("APP_URL", "https://your-app-name.koyeb.app")
+APP_URL = os.getenv("APP_URL", "https://commercial-emma-robel-e81fbc32.koyeb.app")
 WEBHOOK_URL = f"{APP_URL}/webhook"
 
 if not BOT_TOKEN:
@@ -98,7 +98,8 @@ init_db()
 app = Flask(__name__)
 
 # -------------------- Telegram Bot Setup --------------------
-application = Application.builder().token(BOT_TOKEN).build()
+# Build application WITHOUT an updater (essential for webhook mode)
+application = Application.builder().token(BOT_TOKEN).updater(None).build()
 
 # Prices in Ethiopian Birr
 TELEBIRR_ACCOUNT = "0987973732"
@@ -373,10 +374,10 @@ application.add_handler(CallbackQueryHandler(plan_callback, pattern="^plan:"))
 application.add_handler(CallbackQueryHandler(handle_callback, pattern="^(approve|decline):"))
 application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-# Initialize the application (required for webhook processing)
+# Initialize the application (no updater, so no background tasks start)
 async def init_app():
     await application.initialize()
-    await application.start()
+    # No need to call start() – it would only start job queue, which we don't use
 
 asyncio.run(init_app())
 
