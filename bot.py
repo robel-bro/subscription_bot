@@ -32,9 +32,7 @@ if _admins:
         if x and x.isdigit():
             ADMIN_IDS.append(int(x))
 
-# Koyeb will provide the PORT via environment variable
 PORT = int(os.environ.get("PORT", 8000))
-# Your Koyeb app URL - set this in Koyeb environment variables
 APP_URL = os.getenv("APP_URL", "https://your-app-name.koyeb.app")
 WEBHOOK_URL = f"{APP_URL}/webhook"
 
@@ -100,7 +98,6 @@ init_db()
 app = Flask(__name__)
 
 # -------------------- Telegram Bot Setup --------------------
-# Build application (no updater/ polling)
 application = Application.builder().token(BOT_TOKEN).build()
 
 # Prices in Ethiopian Birr
@@ -375,6 +372,13 @@ application.add_handler(CommandHandler("list", list_subscribers, filters=filters
 application.add_handler(CallbackQueryHandler(plan_callback, pattern="^plan:"))
 application.add_handler(CallbackQueryHandler(handle_callback, pattern="^(approve|decline):"))
 application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+
+# Initialize the application (required for webhook processing)
+async def init_app():
+    await application.initialize()
+    await application.start()
+
+asyncio.run(init_app())
 
 # -------------------- Flask Routes --------------------
 @app.route("/")
