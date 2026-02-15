@@ -216,10 +216,14 @@ def health():
 def status():
     return "OK", 200
 
+@app.route("/test")
+def test():
+    return "Test endpoint is working", 200
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """Handle incoming Telegram updates."""
-    # Optional file log (keep for debugging)
+    # Write to log file
     try:
         with open("/tmp/webhook.log", "a") as f:
             f.write(f"Webhook received at {time.time()}\n")
@@ -239,13 +243,21 @@ def webhook():
 
 @app.route("/view_log")
 def view_log():
-    """View the webhook log file."""
+    """View the webhook log file (creates if missing)."""
+    log_path = "/tmp/webhook.log"
+    # Create a dummy file if it doesn't exist
+    if not os.path.exists(log_path):
+        try:
+            with open(log_path, "w") as f:
+                f.write("Log file created at startup.\n")
+        except Exception as e:
+            return f"Error creating log file: {e}"
     try:
-        with open("/tmp/webhook.log", "r") as f:
+        with open(log_path, "r") as f:
             content = f.read()
         return f"<pre>{content}</pre>"
-    except FileNotFoundError:
-        return "No webhook hits yet."
+    except Exception as e:
+        return f"Error reading log: {e}"
 
 @app.route("/set_webhook")
 def set_webhook():
