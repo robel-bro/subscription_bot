@@ -3,7 +3,6 @@ import sqlite3
 import threading
 import time
 import asyncio
-import atexit
 from flask import Flask, request
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -27,7 +26,7 @@ if PRIVATE_CHANNEL_ID and PRIVATE_CHANNEL_ID.lstrip("-").isdigit():
 ADMIN_IDS = []
 _admins = os.getenv("ADMIN_IDS", "")
 if _admins:
-    for x in _admins.split(","):
+    for x in _admins.split(",""):
         x = x.strip()
         if not x:
             continue
@@ -96,7 +95,7 @@ init_db()
 # -------------------- Flask App --------------------
 app = Flask(__name__)
 
-# -------------------- Telegram Bot Handlers (defined first) --------------------
+# -------------------- Telegram Bot Handlers --------------------
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"Start command from user {update.effective_user.id}", flush=True)
     await update.message.reply_text(
@@ -188,24 +187,13 @@ async def approve_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"Approval failed: {e}")
 
-# -------------------- Telegram Bot Setup --------------------
-application = Application.builder().token(BOT_TOKEN).build()
+# -------------------- Bot Setup (Webhook-Only) --------------------
+# Build application with updater=None to disable polling
+application = Application.builder().token(BOT_TOKEN).updater(None).build()
 application.add_handler(CommandHandler("start", start_command))
 application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 application.add_handler(CallbackQueryHandler(handle_callback))
 application.add_handler(CommandHandler("approve", approve_command))
-
-# Initialize the application once (synchronously)
-async def init_app():
-    await application.initialize()
-    await application.start()
-asyncio.run(init_app())
-
-# Shutdown hook
-def shutdown():
-    asyncio.run(application.stop())
-    asyncio.run(application.shutdown())
-atexit.register(shutdown)
 
 # -------------------- Flask Routes --------------------
 @app.route("/")
@@ -223,19 +211,18 @@ def test():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """Handle incoming Telegram updates."""
-    # Write to log file
+    # Log receipt (optional)
     try:
         with open("/tmp/webhook.log", "a") as f:
             f.write(f"Webhook received at {time.time()}\n")
-    except Exception as e:
-        print(f"Error writing log: {e}", flush=True)
+    except:
+        pass
 
     try:
         data = request.get_json(force=True)
-        async def process():
-            update = Update.de_json(data, application.bot)
-            await application.process_update(update)
-        asyncio.run(process())
+        update = Update.de_json(data, application.bot)
+        # Process update in a new event loop (safe for webhooks)
+        asyncio.run(application.process_update(update))
         return "OK", 200
     except Exception as e:
         print(f"❌ Error in webhook: {e}", flush=True)
@@ -243,15 +230,10 @@ def webhook():
 
 @app.route("/view_log")
 def view_log():
-    """View the webhook log file (creates if missing)."""
+    """View the webhook log file."""
     log_path = "/tmp/webhook.log"
-    # Create a dummy file if it doesn't exist
     if not os.path.exists(log_path):
-        try:
-            with open(log_path, "w") as f:
-                f.write("Log file created at startup.\n")
-        except Exception as e:
-            return f"Error creating log file: {e}"
+        return "No webhook hits yet."
     try:
         with open(log_path, "r") as f:
             content = f.read()
