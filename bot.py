@@ -36,7 +36,6 @@ if _admins:
         except ValueError:
             print(f"Warning: ignoring invalid ADMIN_ID '{x}'")
 
-# Base URL for your app – set this in Koyeb environment variables
 APP_URL = os.getenv("APP_URL", "https://commercial-emma-robel-e81fbc32.koyeb.app")
 WEBHOOK_URL = f"{APP_URL}/webhook"
 
@@ -97,26 +96,7 @@ init_db()
 # -------------------- Flask App --------------------
 app = Flask(__name__)
 
-# -------------------- Telegram Bot Setup --------------------
-application = Application.builder().token(BOT_TOKEN).build()
-application.add_handler(CommandHandler("start", start_command))
-application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-application.add_handler(CallbackQueryHandler(handle_callback))
-application.add_handler(CommandHandler("approve", approve_command))
-
-# Initialize the application once (synchronously)
-async def init_app():
-    await application.initialize()
-    await application.start()
-asyncio.run(init_app())
-
-# Shutdown hook
-def shutdown():
-    asyncio.run(application.stop())
-    asyncio.run(application.shutdown())
-atexit.register(shutdown)
-
-# -------------------- Telegram Bot Handlers --------------------
+# -------------------- Telegram Bot Handlers (defined first) --------------------
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"Start command from user {update.effective_user.id}", flush=True)
     await update.message.reply_text(
@@ -208,6 +188,25 @@ async def approve_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"Approval failed: {e}")
 
+# -------------------- Telegram Bot Setup --------------------
+application = Application.builder().token(BOT_TOKEN).build()
+application.add_handler(CommandHandler("start", start_command))
+application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+application.add_handler(CallbackQueryHandler(handle_callback))
+application.add_handler(CommandHandler("approve", approve_command))
+
+# Initialize the application once (synchronously)
+async def init_app():
+    await application.initialize()
+    await application.start()
+asyncio.run(init_app())
+
+# Shutdown hook
+def shutdown():
+    asyncio.run(application.stop())
+    asyncio.run(application.shutdown())
+atexit.register(shutdown)
+
 # -------------------- Flask Routes --------------------
 @app.route("/")
 def health():
@@ -229,7 +228,6 @@ def webhook():
 
     try:
         data = request.get_json(force=True)
-        # Process the update in a fresh event loop
         async def process():
             update = Update.de_json(data, application.bot)
             await application.process_update(update)
@@ -237,7 +235,7 @@ def webhook():
         return "OK", 200
     except Exception as e:
         print(f"❌ Error in webhook: {e}", flush=True)
-        return "OK", 200  # Always return OK
+        return "OK", 200
 
 @app.route("/view_log")
 def view_log():
